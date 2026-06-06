@@ -19,67 +19,83 @@ const bot = new Telegraf(token);
 const userModes = {};
 
 bot.start((ctx) => {
-  ctx.reply(
-    `Welcome to the Tiranga Bot! 🎯\n\nWhat would you like to do?`,
-    Markup.inlineKeyboard([
-      [Markup.button.callback('🔮 Prediction', 'action_predict'), Markup.button.callback('🧠 Training', 'action_train')]
-    ])
-  );
+  sendMainMenu(ctx);
 });
 
-bot.action('action_predict', (ctx) => {
+function sendMainMenu(ctx) {
+  delete userModes[ctx.from.id];
+  ctx.reply(
+    `Welcome to the Tiranga Bot! 🎯\n\nWhat would you like to do?`,
+    Markup.keyboard([
+      ['🔮 Prediction', '🧠 Training']
+    ]).resize()
+  );
+}
+
+bot.hears('🔮 Prediction', (ctx) => {
+  userModes[ctx.from.id] = { action: 'predict' };
   ctx.reply(
     `🔮 <b>Prediction Mode</b>\nPlease select your game mode:`,
     {
       parse_mode: 'HTML',
-      ...Markup.inlineKeyboard([
-        [Markup.button.callback('Win Go 30s', 'predict_30s'), Markup.button.callback('Win Go 1Min', 'predict_1m')],
-        [Markup.button.callback('Win Go 3Min', 'predict_3m'), Markup.button.callback('Win Go 5Min', 'predict_5m')]
-      ])
+      ...Markup.keyboard([
+        ['Win Go 30s', 'Win Go 1Min'],
+        ['Win Go 3Min', 'Win Go 5Min'],
+        ['Go Back']
+      ]).resize()
     }
   );
-  ctx.answerCbQuery();
 });
 
-bot.action('action_train', (ctx) => {
+bot.hears('🧠 Training', (ctx) => {
+  userModes[ctx.from.id] = { action: 'train' };
   ctx.reply(
     `🧠 <b>Training Mode</b>\nPlease select your game mode:`,
     {
       parse_mode: 'HTML',
-      ...Markup.inlineKeyboard([
-        [Markup.button.callback('Win Go 30s', 'train_30s'), Markup.button.callback('Win Go 1Min', 'train_1m')],
-        [Markup.button.callback('Win Go 3Min', 'train_3m'), Markup.button.callback('Win Go 5Min', 'train_5m')]
-      ])
+      ...Markup.keyboard([
+        ['Win Go 30s', 'Win Go 1Min'],
+        ['Win Go 3Min', 'Win Go 5Min'],
+        ['Go Back']
+      ]).resize()
     }
   );
-  ctx.answerCbQuery();
 });
 
-bot.action(/^(predict|train)_(.+)$/, (ctx) => {
-  const action = ctx.match[1];
-  const modeKey = ctx.match[2];
+bot.hears('Go Back', (ctx) => {
+  sendMainMenu(ctx);
+});
+
+bot.hears(/^Win Go (30s|1Min|3Min|5Min)$/, (ctx) => {
+  const modeText = ctx.match[1];
   const modeMap = {
-    '30s': '30 Seconds',
-    '1m': '1 Minute',
-    '3m': '3 Minutes',
-    '5m': '5 Minutes'
+    '30s': { key: '30s', name: '30 Seconds' },
+    '1Min': { key: '1m', name: '1 Minute' },
+    '3Min': { key: '3m', name: '3 Minutes' },
+    '5Min': { key: '5m', name: '5 Minutes' }
   };
-  const modeName = modeMap[modeKey];
   
-  userModes[ctx.from.id] = { action, mode: modeKey, modeName };
+  const selectedMode = modeMap[modeText];
+  let userState = userModes[ctx.from.id];
   
-  if (action === 'predict') {
-    ctx.reply(`✅ Selected: <b>Prediction (${modeName})</b>\n\nNow, please send me the last 6 digits of the period (e.g., 123456) to get a prediction.`, { parse_mode: 'HTML' });
-  } else {
-    ctx.reply(`✅ Selected: <b>Training (${modeName})</b>\n\nNow, please send me the outcome as: <code>[period] [number]</code> (e.g., 123456 8)`, { parse_mode: 'HTML' });
+  if (!userState || !userState.action) {
+    return ctx.reply("⚠️ Please select 'Prediction' or 'Training' first from the Main Menu.", Markup.keyboard([['🔮 Prediction', '🧠 Training']]).resize());
   }
-  ctx.answerCbQuery();
+
+  userState.mode = selectedMode.key;
+  userState.modeName = selectedMode.name;
+  
+  if (userState.action === 'predict') {
+    ctx.reply(`✅ Selected: <b>Prediction (${selectedMode.name})</b>\n\nNow, please send me the last 6 digits of the period (e.g., 123456) to get a prediction.\n\nOr click 'Go Back' to return.`, { parse_mode: 'HTML' });
+  } else {
+    ctx.reply(`✅ Selected: <b>Training (${selectedMode.name})</b>\n\nNow, please send me the outcome as: <code>[period] [number]</code> (e.g., 123456 8)\n\nOr click 'Go Back' to return.`, { parse_mode: 'HTML' });
+  }
 });
 
 bot.hears(/^(?:result\s+)?(\d+)\s+(\d)$/i, (ctx) => {
   const userState = userModes[ctx.from.id];
-  if (!userState || userState.action !== 'train') {
-    return ctx.reply("⚠️ Please select 'Training' mode from /start first.");
+  if (!userState || userState.action !== 'train' || !userState.mode) {
+    return ctx.reply("⚠️ Please select 'Training' mode and a game mode first.", Markup.keyboard([['🔮 Prediction', '🧠 Training']]).resize());
   }
   
   const period = ctx.match[1];
@@ -109,8 +125,8 @@ bot.hears(/^(?:result\s+)?(\d+)\s+(\d)$/i, (ctx) => {
 
 bot.hears(/^\d{6}$/, (ctx) => {
   const userState = userModes[ctx.from.id];
-  if (!userState || userState.action !== 'predict') {
-    return ctx.reply("⚠️ Please select 'Prediction' mode from /start first.");
+  if (!userState || userState.action !== 'predict' || !userState.mode) {
+    return ctx.reply("⚠️ Please select 'Prediction' mode and a game mode first.", Markup.keyboard([['🔮 Prediction', '🧠 Training']]).resize());
   }
   
   const period = ctx.message.text;
