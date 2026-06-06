@@ -45,15 +45,15 @@ bot.hears(/^\d{6}$/, (ctx) => {
   const period = ctx.message.text;
   const mode = userModes[ctx.from.id] || '1 Minute'; // default to 1 min
   
-  // Predict Color based on Period (Even/Odd rule from history)
+  // Predict Color based on Period (Reverse Even/Odd rule from updated history, 51.3% win rate)
   const isEven = parseInt(period) % 2 === 0;
-  const color = isEven ? "Red 🔴" : "Green 🟢";
-  const size = isEven ? "Small 📉" : "Big 📈";
+  const color = !isEven ? "Red 🔴" : "Green 🟢";
+  const size = !isEven ? "Small 📉" : "Big 📈";
   
   // Pick a random number that matches the color
-  const redNumbers = [2, 4, 6, 8];
-  const greenNumbers = [1, 3, 7, 9];
-  const number = isEven 
+  const redNumbers = [2, 4, 6, 8, 0];
+  const greenNumbers = [1, 3, 5, 7, 9];
+  const number = !isEven 
     ? redNumbers[Math.floor(Math.random() * redNumbers.length)] 
     : greenNumbers[Math.floor(Math.random() * greenNumbers.length)];
   
