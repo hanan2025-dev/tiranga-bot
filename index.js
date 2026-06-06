@@ -20,29 +20,68 @@ const userModes = {};
 
 bot.start((ctx) => {
   ctx.reply(
-    `Welcome to the Tiranga Prediction Bot! 🎯\n\nPlease select your game mode:`,
+    `Welcome to the Tiranga Bot! 🎯\n\nWhat would you like to do?`,
     Markup.inlineKeyboard([
-      [Markup.button.callback('Win Go 30s', 'mode_30s'), Markup.button.callback('Win Go 1Min', 'mode_1m')],
-      [Markup.button.callback('Win Go 3Min', 'mode_3m'), Markup.button.callback('Win Go 5Min', 'mode_5m')]
+      [Markup.button.callback('🔮 Prediction', 'action_predict'), Markup.button.callback('🧠 Training', 'action_train')]
     ])
   );
 });
 
-bot.action(/mode_(.+)/, (ctx) => {
+bot.action('action_predict', (ctx) => {
+  ctx.reply(
+    `🔮 <b>Prediction Mode</b>\nPlease select your game mode:`,
+    {
+      parse_mode: 'HTML',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('Win Go 30s', 'predict_30s'), Markup.button.callback('Win Go 1Min', 'predict_1m')],
+        [Markup.button.callback('Win Go 3Min', 'predict_3m'), Markup.button.callback('Win Go 5Min', 'predict_5m')]
+      ])
+    }
+  );
+  ctx.answerCbQuery();
+});
+
+bot.action('action_train', (ctx) => {
+  ctx.reply(
+    `🧠 <b>Training Mode</b>\nPlease select your game mode:`,
+    {
+      parse_mode: 'HTML',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('Win Go 30s', 'train_30s'), Markup.button.callback('Win Go 1Min', 'train_1m')],
+        [Markup.button.callback('Win Go 3Min', 'train_3m'), Markup.button.callback('Win Go 5Min', 'train_5m')]
+      ])
+    }
+  );
+  ctx.answerCbQuery();
+});
+
+bot.action(/^(predict|train)_(.+)$/, (ctx) => {
+  const action = ctx.match[1];
+  const modeKey = ctx.match[2];
   const modeMap = {
     '30s': '30 Seconds',
     '1m': '1 Minute',
     '3m': '3 Minutes',
     '5m': '5 Minutes'
   };
-  const mode = ctx.match[1];
-  userModes[ctx.from.id] = modeMap[mode];
+  const modeName = modeMap[modeKey];
   
-  ctx.reply(`✅ Selected Mode: <b>${modeMap[mode]}</b>\n\nNow, please send me the last 6 digits of the period (e.g., 123456) to get a prediction.\n\n🧠 <b>To train the bot with an outcome:</b>\nSend: <code>result [period] [number]</code>\nExample: <code>result 123456 8</code>`, { parse_mode: 'HTML' });
+  userModes[ctx.from.id] = { action, mode: modeKey, modeName };
+  
+  if (action === 'predict') {
+    ctx.reply(`✅ Selected: <b>Prediction (${modeName})</b>\n\nNow, please send me the last 6 digits of the period (e.g., 123456) to get a prediction.`, { parse_mode: 'HTML' });
+  } else {
+    ctx.reply(`✅ Selected: <b>Training (${modeName})</b>\n\nNow, please send me the outcome as: <code>[period] [number]</code> (e.g., 123456 8)`, { parse_mode: 'HTML' });
+  }
   ctx.answerCbQuery();
 });
 
-bot.hears(/^result\s+(\d+)\s+(\d)$/i, (ctx) => {
+bot.hears(/^(?:result\s+)?(\d+)\s+(\d)$/i, (ctx) => {
+  const userState = userModes[ctx.from.id];
+  if (!userState || userState.action !== 'train') {
+    return ctx.reply("⚠️ Please select 'Training' mode from /start first.");
+  }
+  
   const period = ctx.match[1];
   const number = parseInt(ctx.match[2]);
   
@@ -54,10 +93,14 @@ bot.hears(/^result\s+(\d+)\s+(\d)$/i, (ctx) => {
   else color = 'Green';
   
   const entry = `${period} - ${number} - ${size} - ${color}\n`;
+  const filename = `history_${userState.mode}.txt`;
   
   try {
+    fs.appendFileSync(filename, entry);
+    // Also append to general history.txt
     fs.appendFileSync('history.txt', entry);
-    ctx.reply(`✅ <b>Training Data Saved!</b>\nPeriod: ${period}\nOutcome: ${number} - ${size} - ${color}\n\nThe bot has learned from this outcome.`, { parse_mode: 'HTML' });
+    
+    ctx.reply(`✅ <b>Training Data Saved!</b>\nMode: ${userState.modeName}\nPeriod: ${period}\nOutcome: ${number} - ${size} - ${color}\n\nThe bot has learned from this outcome.`, { parse_mode: 'HTML' });
   } catch (err) {
     ctx.reply(`❌ Failed to save outcome.`);
     console.error(err);
@@ -65,8 +108,13 @@ bot.hears(/^result\s+(\d+)\s+(\d)$/i, (ctx) => {
 });
 
 bot.hears(/^\d{6}$/, (ctx) => {
+  const userState = userModes[ctx.from.id];
+  if (!userState || userState.action !== 'predict') {
+    return ctx.reply("⚠️ Please select 'Prediction' mode from /start first.");
+  }
+  
   const period = ctx.message.text;
-  const mode = userModes[ctx.from.id] || '1 Minute'; // default to 1 min
+  const mode = userState.modeName;
   
   // Predict Color based on Period (Reverse Even/Odd rule from updated history, 51.3% win rate)
   const isEven = parseInt(period) % 2 === 0;
