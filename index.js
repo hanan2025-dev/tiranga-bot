@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
+const fs = require('fs');
 
 const token = process.env.BOT_TOKEN;
 if (!token) {
@@ -37,8 +38,30 @@ bot.action(/mode_(.+)/, (ctx) => {
   const mode = ctx.match[1];
   userModes[ctx.from.id] = modeMap[mode];
   
-  ctx.reply(`✅ Selected Mode: <b>${modeMap[mode]}</b>\n\nNow, please send me the last 6 digits of the period (e.g., 123456) to get a prediction.`, { parse_mode: 'HTML' });
+  ctx.reply(`✅ Selected Mode: <b>${modeMap[mode]}</b>\n\nNow, please send me the last 6 digits of the period (e.g., 123456) to get a prediction.\n\n🧠 <b>To train the bot with an outcome:</b>\nSend: <code>result [period] [number]</code>\nExample: <code>result 123456 8</code>`, { parse_mode: 'HTML' });
   ctx.answerCbQuery();
+});
+
+bot.hears(/^result\s+(\d+)\s+(\d)$/i, (ctx) => {
+  const period = ctx.match[1];
+  const number = parseInt(ctx.match[2]);
+  
+  let size = number >= 5 ? 'Big' : 'Small';
+  let color = '';
+  if (number === 0) color = 'Red/Violet';
+  else if (number === 5) color = 'Green/Violet';
+  else if (number % 2 === 0) color = 'Red';
+  else color = 'Green';
+  
+  const entry = `${period} - ${number} - ${size} - ${color}\n`;
+  
+  try {
+    fs.appendFileSync('history.txt', entry);
+    ctx.reply(`✅ <b>Training Data Saved!</b>\nPeriod: ${period}\nOutcome: ${number} - ${size} - ${color}\n\nThe bot has learned from this outcome.`, { parse_mode: 'HTML' });
+  } catch (err) {
+    ctx.reply(`❌ Failed to save outcome.`);
+    console.error(err);
+  }
 });
 
 bot.hears(/^\d{6}$/, (ctx) => {
