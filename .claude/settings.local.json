@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.goaoko.com)",
+      "WebSearch"
+    ]
+  }
+}
