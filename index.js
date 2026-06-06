@@ -171,10 +171,24 @@ server.listen(PORT, () => {
   console.log(`Dummy web server running on port ${PORT}`);
 });
 
-bot.launch().then(() => {
-  console.log('Bot is running...');
-});
+const startBot = async () => {
+  try {
+    await bot.launch();
+    console.log('Bot is running...');
+  } catch (err) {
+    console.error('Failed to launch bot:', err.message);
+    if (err.response && err.response.error_code === 409) {
+      console.log('Conflict error: Another instance is running. Retrying in 5 seconds...');
+      setTimeout(startBot, 5000);
+    }
+  }
+};
+startBot();
 
-// Enable graceful stop
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+// Enable graceful stop safely
+process.once('SIGINT', () => {
+  try { bot.stop('SIGINT'); } catch (e) {}
+});
+process.once('SIGTERM', () => {
+  try { bot.stop('SIGTERM'); } catch (e) {}
+});
