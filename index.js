@@ -62,7 +62,7 @@ bot.hears('🧠 Training', (ctx) => {
   );
 });
 
-bot.hears('Go Back', (ctx) => {
+bot.hears(/^🔙?\s*Go Back$/i, (ctx) => {
   sendMainMenu(ctx);
 });
 
@@ -86,9 +86,25 @@ bot.hears(/^Win Go (30s|1Min|3Min|5Min)$/, (ctx) => {
   userState.modeName = selectedMode.name;
   
   if (userState.action === 'predict') {
-    ctx.reply(`✅ Selected: <b>Prediction (${selectedMode.name})</b>\n\nNow, please send me the last 6 digits of the period (e.g., 123456) to get a prediction.\n\nOr click 'Go Back' to return.`, { parse_mode: 'HTML' });
+    ctx.reply(
+      `✅ Selected: <b>Prediction (${selectedMode.name})</b>\n\nNow send me the last 6 digits of the period (e.g., <code>123456</code>) to get a prediction.`,
+      {
+        parse_mode: 'HTML',
+        ...Markup.keyboard([
+          ['🔙 Go Back']
+        ]).resize()
+      }
+    );
   } else {
-    ctx.reply(`✅ Selected: <b>Training (${selectedMode.name})</b>\n\nNow, please send me the outcome as: <code>[period] [number]</code> (e.g., 123456 8)\n\nOr click 'Go Back' to return.`, { parse_mode: 'HTML' });
+    ctx.reply(
+      `✅ Selected: <b>Training (${selectedMode.name})</b>\n\nSend the outcome as: <code>[period] [number]</code>\nExample: <code>123456 8</code>`,
+      {
+        parse_mode: 'HTML',
+        ...Markup.keyboard([
+          ['🔙 Go Back']
+        ]).resize()
+      }
+    );
   }
 });
 
