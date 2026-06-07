@@ -545,15 +545,28 @@ server.listen(PORT, () => {
   console.log('Premium dashboard running on port ' + PORT);
 });
 
-const startBot = async () => {
+const startBot = async (attempt = 1) => {
+  const MAX_ATTEMPTS = 5;
   try {
+    // Drop any stale polling session / webhook from a previous deploy
+    await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+    console.log('Webhook cleared. Launching bot...');
     await bot.launch();
     console.log('Bot is running...');
   } catch (err) {
-    console.error('Failed to launch bot:', err.message);
+    console.error(`Failed to launch bot (attempt ${attempt}):`, err.message);
     if (err.response && err.response.error_code === 409) {
-      console.log('Conflict error: Another instance is running. Retrying in 5 seconds...');
-      setTimeout(startBot, 5000);
+      if (attempt >= MAX_ATTEMPTS) {
+        console.error('Max retry attempts reached. Exiting.');
+        process.exit(1);
+      }
+      const delay = Math.min(5000 * attempt, 30000); // exponential backoff, max 30s
+      console.log(`Conflict error: retrying in ${delay / 1000}s... (attempt ${attempt}/${MAX_ATTEMPTS})`);
+      setTimeout(() => startBot(attempt + 1), delay);
+    } else {
+      // Non-409 error — don't retry
+      console.error('Unrecoverable error. Exiting.');
+      process.exit(1);
     }
   }
 };
