@@ -526,7 +526,7 @@ const server = http.createServer((req, res) => {
 });
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
-  console.log(\`Premium dashboard running on port \${PORT}\`);
+  console.log('Premium dashboard running on port ' + PORT);
 });
 
 const startBot = async () => {
